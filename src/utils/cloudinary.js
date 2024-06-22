@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs'
+import { ApiError } from './ApiError.js'
 
 // Configuration
 cloudinary.config({
@@ -21,8 +22,25 @@ const uploadOnCloudinary = async (localFilePath) => {
         return response;
     } catch (error) {
         fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
-        return null;
+        throw new ApiError(500, error?.message || "Server error")
     }
 }
 
-export { uploadOnCloudinary }
+const deleteOnCloudinary = async (oldImageUrl, publicId) => {
+    try {
+        if (!(oldImageUrl || publicId)) {
+            throw new ApiError(404, "OldImageUrl or publicId required")
+        }
+        const response = await cloudinary.uploader.destroy(
+            publicId,
+            {
+                resource_type: `${oldImageUrl.includes("image") ? "image" : "video"}`
+            }
+        )
+        return response;
+    } catch (error) {
+        throw new ApiError(500, error?.message || "Server error");
+    }
+}
+
+export { uploadOnCloudinary, deleteOnCloudinary }
