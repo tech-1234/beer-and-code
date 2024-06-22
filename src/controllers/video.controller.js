@@ -298,10 +298,59 @@ const updateVideo = asyncHandler(async (req, res) => {
 
 })
 
+const deleteVideo = asyncHandler(async (req, res) => {
+    const { videoId } = req.params;
+    var deleteVideoFilePromise;
+    var deleteThumbnailPromise;
+    try {
+        // 1. Validate videoId and fetch video details (optimized query)
+        const video = await Video.findById(videoId, { videoFile: 1, thumbnail: 1 })
+            .select('_id videoFile thumbnail'); // Use aggregation pipeline for efficiency
+
+        if (!video) throw new ApiError(404, "No Video Found");
+
+        // 2. Delete video file and thumbnail from Cloudinary (concurrent calls)
+        [deleteVideoFilePromise, deleteThumbnailPromise] = await Promise.all([
+            deleteOnCloudinary(video.videoFile.url, video.videoFile.publicId),
+            deleteOnCloudinary(video.thumbnail.url, video.thumbnail.publicId)
+        ]);
+
+        // 3. Delete video from database
+        await Video.findByIdAndDelete(videoId);
+
+        // 4. Remove video from related collections (optimized updates)
+        const updatePromises = [
+            User.updateMany({ watchHistory: videoId }, { $pull: { watchHistory: videoId } })
+        ];
+
+        await Promise.all(updatePromises);
+
+
+        // 5. Handle any remaining tasks (e.g., removing likes)
+        // ...
+
+        return res.status(200).json(new ApiResponse(201, {}, "Video Deleted Successfully"));
+
+    } catch (error) {
+        console.error("Error while deleting video:", error);
+
+        // Rollback Cloudinary actions if necessary
+        try {
+            if (deleteVideoFilePromise?.error) await deleteVideoFilePromise.retry(); // Attempt retry
+            if (deleteThumbnailPromise?.error) await deleteThumbnailPromise.retry();
+        } catch (cloudinaryError) {
+            console.error("Failed to rollback Cloudinary deletions:", cloudinaryError);
+        }
+
+        throw new ApiError(500, error.message || 'Server Error while deleting video');
+    }
+})
+
 
 export {
     getAllVideos,
     publishAVideo,
     getVideoById,
-    updateVideo
+    updateVideo,
+    deleteVideo
 }
