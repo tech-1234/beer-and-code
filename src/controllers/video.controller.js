@@ -1,6 +1,6 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from "../utils/ApiError.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { Video } from "../models/video.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose, { isValidObjectId } from 'mongoose';
@@ -231,9 +231,77 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 })
 
+const updateVideo = asyncHandler(async (req, res) => {
+    //TODO: update video details like title, description, thumbnail
+    const { videoId } = req.params;
+    const { title, description } = req.body;
+    const thumbnailLocalPath = req.file?.path;
+
+
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "Invalid Video Id");
+
+    const oldVideo = await Video.findById(videoId, { thumbnail: 1 });
+    if (!oldVideo) throw new ApiError(404, "No Video Found");
+
+    if (
+        !(thumbnailLocalPath || !(!title || title?.trim() === "") || !(!description || description?.trim() === ""))
+    ) {
+        throw new ApiError(400, "update fields are required")
+    }
+
+    const updatedThumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!updatedThumbnail) throw new ApiError(500, "thumbnail not uploaded on cloudinary");
+
+
+    const { publicId, url } = oldVideo?.thumbnail;
+    if (!(publicId || url)) throw new ApiError(500, "old thumbnail url or publicId not found");
+
+    const video = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $set: {
+                title,
+                description,
+                thumbnail: {
+                    publicId: updatedThumbnail?.public_id,
+                    url: updatedThumbnail?.url
+                }
+            }
+
+        },
+        {
+            new: true
+        }
+    )
+
+    if (!video) {
+        await deleteOnCloudinary(updatedThumbnail?.url, updatedThumbnail?.public_id);
+        console.error("video not updated successfully", error)
+        throw new ApiError(500, "updated video not uploaded on database");
+    }
+
+    if (url) {
+        try {
+            await deleteOnCloudinary(url, publicId)
+        } catch (error) {
+
+            console.log(`Failed to Delete Old thumbnail From Cloudinary Server ${error}`);
+            throw new ApiError(500, error?.message || 'Server Error');
+        }
+    }
+    return res.status(200)
+        .json(new ApiResponse(
+            201,
+            video,
+            "Video Updated Successfully"
+        ))
+
+})
+
 
 export {
     getAllVideos,
     publishAVideo,
-    getVideoById
+    getVideoById,
+    updateVideo
 }
