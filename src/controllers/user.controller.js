@@ -430,12 +430,14 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 const getWatchHistory = asyncHandler(async (req, res) => {
     const user = await User.aggregate([
         {
+            // searching for user in users collection using user._id
             $match: {
                 _id: new mongoose.Types.ObjectId(req.user?._id),
             },
         },
 
         {
+            // joining users and videos collection using users.watchHistory = videos._id and naming as 'watchHistory'
             $lookup: {
                 from: "videos",
                 localField: "watchHistory",
@@ -449,7 +451,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                             },
                         },
                     },
-
+                    // nested pipeline and that document 'watchHistory' will join with users collection using watchHistory._id = users.owner
                     {
                         $lookup: {
                             from: "users",
@@ -467,6 +469,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                             ],
                         },
                     },
+                    // adding field 'owner' it will appear first
                     {
                         $addFields: {
                             owner: {
@@ -487,7 +490,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 ],
             },
         },
-
+        // sort in descending order
         {
             $sort: {
                 watchedAt: -1,

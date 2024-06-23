@@ -28,10 +28,12 @@ const getAllVideos = asyncHandler(async (req, res) => {
     let videoAggregate;
     try {
         videoAggregate = Video.aggregate([
+            // searching in videos collection with title and description
             {
                 $match: matchCondition
             },
             {
+                // joining videos and users collection with users._id and videos.owner and naming the document as 'owner'
                 $lookup: {
                     from: "users",
                     localField: "owner",
@@ -39,6 +41,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     as: "owner",
                     pipeline: [
                         {
+                            // extracting owner details (_id, fullName, avatar.url, username)
                             $project: {
                                 _id: 1,
                                 fullName: 1,
@@ -49,6 +52,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     ]
                 }
             },
+            // Adding field owner and it will appear first
             {
                 $addFields: {
                     owner: {
@@ -56,6 +60,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     },
                 },
             },
+            // sorting according to sortType which is ascending in this case
             {
                 $sort: {
                     [sortBy]: sortDirection
@@ -177,11 +182,13 @@ const getVideoById = asyncHandler(async (req, res) => {
         }
     )
     const video = await Video.aggregate([
+        // searching video from videos collection using videoId
         {
             $match: {
                 _id: new mongoose.Types.ObjectId(videoId)
             }
         },
+        // joining users and videos collection using users._id = videos.owner and naming the document as 'owner'
         {
             $lookup: {
                 from: "users",
@@ -190,6 +197,7 @@ const getVideoById = asyncHandler(async (req, res) => {
                 as: "owner",
                 pipeline: [
                     {
+                        // extracting owner details (_id, fullName, avatar.url, username)
                         $project: {
                             username: 1,
                             avatar: "$avatar.url",
@@ -201,6 +209,7 @@ const getVideoById = asyncHandler(async (req, res) => {
                 ]
             }
         },
+        // Adding field owner and it will appear first
         {
             $addFields: {
                 owner: {
