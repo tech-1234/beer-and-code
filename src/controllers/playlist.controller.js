@@ -112,7 +112,6 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
             ]
         )
 
-        console.log(playlistAggregate)
         if (!playlistAggregate) throw new ApiError(404, "Playlist not found");
 
         return res
