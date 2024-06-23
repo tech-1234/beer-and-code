@@ -48,12 +48,14 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         if (!user) throw new ApiError(404, "User not found");
         const playlistAggregate = await Playlist.aggregate(
             [
+                // searching for requested owner's list with owner id
                 {
                     $match: {
                         owner: new mongoose.Types.ObjectId(userId)
                     },
                 },
                 {
+                    // searching from videos collection with video id and creating array of objects as 'videos'
                     $lookup: {
                         from: "videos",
                         localField: "videos",
@@ -61,6 +63,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                         as: "videos",
                         pipeline: [
                             {
+                                // searching from users collection with video owner id and creating array of objects as 'owner'
                                 $lookup: {
                                     from: "users",
                                     localField: "owner",
@@ -68,6 +71,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                                     as: "owner",
                                     pipeline: [
                                         {
+                                            // extracting owner details like (fullName, username, avatar)
                                             $project: {
                                                 fullName: 1,
                                                 username: 1,
@@ -77,7 +81,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                                     ],
                                 },
                             },
-
+                            // adding videoOwner field as owner
                             {
                                 $addFields: {
                                     videoOwner: {
@@ -85,17 +89,17 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                                     }
                                 },
                             },
-
+                            // removing owner field
                             {
                                 $unset: "owner"
                             },
-
+                            // adding videoFile field as videoFile.url
                             {
                                 $addFields: {
                                     videoFile: "$videoFile.url"
                                 },
                             },
-
+                            // adding thumbnail field as thumbnail.url
                             {
                                 $addFields: {
                                     thumbnail: "$thumbnail.url"
@@ -106,6 +110,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                     },
 
                 },
+                // deconstructing the array of videos as videos object
                 {
                     $unwind: "$videos"
                 },
