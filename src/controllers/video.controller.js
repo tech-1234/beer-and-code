@@ -5,6 +5,7 @@ import { Video } from "../models/video.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose, { isValidObjectId } from 'mongoose';
 import { User } from '../models/user.model.js';
+import { Playlist } from '../models/playlist.model.js';
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -329,7 +330,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
         // 4. Remove video from related collections (optimized updates)
         const updatePromises = [
-            User.updateMany({ watchHistory: videoId }, { $pull: { watchHistory: videoId } })
+            User.updateMany({ watchHistory: videoId }, { $pull: { watchHistory: videoId } }),
+            Playlist.updateMany({ videos: videoId }, { $pull: { videos: videoId } }),
         ];
 
         await Promise.all(updatePromises);
