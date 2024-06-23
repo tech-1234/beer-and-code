@@ -45,12 +45,14 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     if (!req.user?._id) throw new ApiError(404, "Unauthorized user")
 
     const pipeline = [
+        // searching subscriberId as 'subscriber' from Subscription collections 
         {
             $match: {
                 subscriber: new mongoose.Types.ObjectId(subscriberId),
             },
         },
         {
+            // joining users and subscriptions collection with users._id and subscription.channel and naming as subscribedTo field
             $lookup: {
                 from: "users",
                 localField: "channel",
@@ -58,6 +60,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
                 as: "subscribedTo",
                 pipeline: [
                     {
+                        // extracting the user i.e subscribers details like (fullName, username, avatar.url)
                         $project: {
                             fullName: 1,
                             username: 1,
@@ -67,9 +70,11 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
                 ]
             }
         },
+        // deconstructing the subscribedTo array in object
         {
             $unwind: "$subscribedTo"
         },
+        // renaming subscribedTo object as subscribed channel
         {
             $project: {
                 subscribedChannel: "$subscribedTo"
@@ -105,11 +110,13 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
     if (!req.user?._id) throw new ApiError(404, "Unauthorized user")
     const pipeline = [
         {
+            // searching for channelId from subscriptions collection
             $match: {
                 channel: new mongoose.Types.ObjectId(channelId),
             }
         },
         {
+            // joining users and subscription collection with users._id and subscriptions.subscriber and naming the document as subscriber
             $lookup: {
                 from: "users",
                 localField: "subscriber",
@@ -126,6 +133,7 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
                 ]
             }
         },
+        // adding subscriber field as first document
         {
             $addFields: {
                 subscriber: {
