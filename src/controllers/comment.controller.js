@@ -22,7 +22,7 @@ const addComment = asyncHandler(async (req, res) => {
     if (!isValidObjectId(videoId)) throw new ApiError(400, "Video id is not valid id")
 
     const video = await Video.findById(videoId, { _id: 1 });
-    if (!user) throw new ApiError(404, "Video not found")
+    if (!video) throw new ApiError(404, "Video not found")
 
     const user = await User.findById(req.user?._id, { _id: 1 });
     if (!user) throw new ApiError(404, "User is not authorized")
@@ -30,7 +30,7 @@ const addComment = asyncHandler(async (req, res) => {
     const comment = await Comment.create({
         content,
         video: video._id,
-        owner: owner._id
+        owner: user._id
     })
 
     if (!comment) throw new ApiError(400, "Something went wrong while creating comment")
@@ -53,6 +53,8 @@ const updateComment = asyncHandler(async (req, res) => {
     const comment = await Comment.findById(commentId, { _id: 1 });
     if (!comment) throw new ApiError(404, "Not found comment for this id")
 
+    const user = await User.findById(req.user?._id, { _id: 1 });
+    if (!user) throw new ApiError(404, "User is not authorized")
 
     const { content } = req.body;
     if (content?.trim() === "") throw new ApiError(404, "content is required")
@@ -81,6 +83,27 @@ const updateComment = asyncHandler(async (req, res) => {
 
 const deleteComment = asyncHandler(async (req, res) => {
     // TODO: delete a comment
+    try {
+        const { commentId } = req.params;
+        if (!isValidObjectId(commentId)) throw new ApiError(404, "Not found comment for this id")
+
+        const comment = await Comment.findById(commentId, { _id: 1 });
+        if (!comment) throw new ApiError(404, "Not found comment for this id")
+
+        await Comment.findByIdAndDelete(commentId);
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    {},
+                    "Comment deleted successfully"
+                )
+            )
+    } catch (error) {
+        throw new ApiError(500, error?.message || "Something went wrong while deleting the comment")
+    }
+
 })
 
 export {
