@@ -11,6 +11,78 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     const { page = 1, limit = 10 } = req.query
 
+    if (!isValidObjectId(videoId)) throw new ApiError(400, "Not a valid video id");
+
+    try {
+        const video = await Video.findById(videoId, { _id: 1 });
+        if (!video) throw new ApiError(404, "Video not found");
+
+        const commentAggregate = Comment.aggregate([
+            {
+                $match: {
+                    video: new mongoose.Types.ObjectId(videoId)
+                },
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "owner",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                username: 1,
+                                avatar: "$avatar.url",
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $addFields: {
+                    owner: {
+                        $first: "$owner",
+                    },
+                },
+            },
+            {
+                $sort: {
+                    createdAt: -1,
+                },
+            },
+        ]);
+
+        const options = {
+            page,
+            limit,
+            customLabels: {
+                docs: "comments",
+                totalDocs: "totalComments",
+
+            },
+            skip: (page - 1) * limit,
+            limit: parseInt(limit),
+        }
+        const result = await Comment.aggregatePaginate(commentAggregate, options);
+        if (result?.comments.length === 0) {
+            return res.status(200).json(new ApiResponse(
+                200,
+                [],
+                "No comments found"
+            ));
+        }
+        return res.status(200).json(new ApiResponse(
+            200,
+            result,
+            "success"
+        ));
+    } catch (error) {
+        throw new ApiError(500, error?.message || "Internal server error")
+    }
+
+
 })
 
 const addComment = asyncHandler(async (req, res) => {
